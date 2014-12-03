@@ -7,7 +7,9 @@ module Match
 class Binder < Struct.new(:index, :binder, :value)
 
   ##
-  # Just make sure we get symbols for variables we want to bind.
+  # Just make sure we get symbols for variables we want to bind and keep track
+  # of the index because that is how we get the component of the struct we are
+  # interested in.
 
   def initialize(index, binder, value)
     if !(Symbol === binder)
@@ -18,7 +20,7 @@ class Binder < Struct.new(:index, :binder, :value)
 
   ##
   # Do the matching and if successful save the results into the context.
-  # Success is indicated by returning a non-nil value.
+  # Success is indicated by returning a non-nil updated context object.
 
   def match(value, context)
     if (self.value === (v = value[index]) ||
@@ -44,7 +46,7 @@ class Matcher < Struct.new(:type_matcher, :binders)
 
   ##
   # Do some basic validation and create the binders that will do the bulk of the matching
-  # and context creation for matching block evaluation.
+  # and context creation for block evaluation.
 
   def initialize(type_matcher, binders)
     if !(Struct == type_matcher.superclass.superclass)
@@ -66,11 +68,11 @@ class Matcher < Struct.new(:type_matcher, :binders)
   ##
   # The driver for passing the relevant pieces to the binders for doing the
   # matching. The binders themselves can have matchers so the process is
-  # mutually recursive.
+  # recursive. See the Example directory for how to use nested matchers.
 
   def match(value, context = {})
     if !(type_matcher === value)
-      raise StandardError, "Value type mismatch: value type = #{value.class}, match type = #{type_matcher}."
+      return nil
     end
     binders.each do |binder|
       return nil unless binder.match(value, context)
@@ -91,7 +93,7 @@ class BlockEvalContext < BasicObject
   end
 
   def method_missing(variable, *args)
-    @variables[variable]
+    @variables[variable] || ::Kernel.raise(StandardError, "Missing variable.")
   end
 
 end
