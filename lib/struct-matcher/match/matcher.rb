@@ -12,9 +12,7 @@ class Binder < Struct.new(:index, :binder, :value)
   # interested in.
 
   def initialize(index, binder, value)
-    if !(Symbol === binder)
-      raise StandardError, "Must supply symbol for capturing matches."
-    end
+    raise StandardError, "Must supply symbol for capturing matches." unless Symbol === binder
     super(index, binder, value)
   end
 
@@ -23,7 +21,7 @@ class Binder < Struct.new(:index, :binder, :value)
   # Success is indicated by returning a non-nil updated context object.
 
   def match(value, context)
-    if (self.value === (v = value[index]) ||
+    if (self.value === (v = value[self.index]) ||
      (Matcher === self.value && self.value.match(v, context)))
       context[binder] = v; return context
     else
@@ -49,21 +47,15 @@ class Matcher < Struct.new(:type_matcher, :binders)
   # and context creation for block evaluation.
 
   def initialize(type_matcher, binders)
-    if !(Struct == type_matcher.superclass.superclass)
-      raise StandardError, "Type matcher must be a struct."
-    end
-    binder_instances = binders.each_with_index.map do |(binder, value), index|
-      Binder.new(index, binder, value)
-    end
-    super(type_matcher, binder_instances)
+    raise StandardError, "Type matcher must be a struct." unless Struct == type_matcher.superclass.superclass
+    binders = binders.each_with_index.map {|(binder, val), i| Binder.new(i, binder, val)}
+    super(type_matcher, binders)
   end
 
   ##
   # Attach a block of code that should be executed if the match is successful.
 
-  def >>(blk)
-    @block = blk
-  end
+  def >>(blk); @block = blk; end
 
   ##
   # The driver for passing the relevant pieces to the binders for doing the
@@ -71,13 +63,9 @@ class Matcher < Struct.new(:type_matcher, :binders)
   # recursive. See the Example directory for how to use nested matchers.
 
   def match(value, context = {})
-    if !(type_matcher === value)
-      return nil
-    end
-    binders.each do |binder|
-      return nil unless binder.match(value, context)
-    end
-    return context
+    return nil unless type_matcher === value
+    binders.each {|binder| return nil unless binder.match(value, context)}
+    context
   end
 
 end
@@ -88,9 +76,7 @@ end
 
 class BlockEvalContext < BasicObject
 
-  def initialize(variables)
-    @variables = variables
-  end
+  def initialize(variables); @variables = variables; end
 
   def method_missing(variable, *args)
     @variables[variable] || ::Kernel.raise(StandardError, "Missing variable.")
@@ -107,23 +93,17 @@ class MatcherContext
   ##
   # Just need to keep track of the matchers as they are initialized.
 
-  def initialize
-    @matchers = []
-  end
+  def initialize; @matchers = []; end
 
   ##
   # Convenience method for generating a matcher instance.
 
-  def m(type, *binders)
-    Matcher.new(type, binders)
-  end
+  def m(type, *binders); Matcher.new(type, binders); end
 
   ##
   # Convenience method for appending to the list of matchers.
 
-  def with(matcher)
-    @matchers << matcher; matcher
-  end
+  def with(matcher); @matchers << matcher; matcher; end
 
   ##
   # Run through the matchers and return the result of evaluating the block for the first
